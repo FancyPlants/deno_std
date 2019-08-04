@@ -1,9 +1,9 @@
 // Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
-import { listen, Listener, Conn } from "deno";
-import { TextProtoReader } from "../textproto/mod.ts";
-import { BufReader } from "../io/bufio.ts";
-import { encode, decode } from "../strings/strings.ts";
-import { WebSocket, OpCode } from "../ws/mod.ts";
+const { listen } = Deno;
+import { TextProtoReader } from 'https://deno.land/std/textproto/mod.ts';
+import { BufReader } from 'https://deno.land/std/io/bufio.ts';
+import { encode } from 'https://deno.land/std/strings/mod.ts';
+// import { WebSocket, OpCode } from 'https://deno.land/std/ws/mod.ts';
 
 /** Represents some underlying connection, so we can use Websockets too. */
 export interface MessageSource {
@@ -13,21 +13,21 @@ export interface MessageSource {
 }
 
 class TcpSource implements MessageSource {
-  private _conn: Conn;
+  private _conn: Deno.Conn;
   private _reader: TextProtoReader;
 
-  constructor(conn: Conn) {
+  public constructor(conn: Deno.Conn) {
     this._conn = conn;
     this._reader = new TextProtoReader(new BufReader(conn));
   }
 
-  close() {
+  public close(): void {
     this._conn.close();
   }
 
-  async write(msg: string | Uint8Array): Promise<void> {
+  public async write(msg: string | Uint8Array): Promise<void> {
     let encoded: Uint8Array;
-    if (typeof msg === "string") {
+    if (typeof msg === 'string') {
       encoded = encode(msg);
     } else {
       encoded = msg;
@@ -36,115 +36,117 @@ class TcpSource implements MessageSource {
     await this._conn.write(encoded);
   }
 
-  async *messages(): AsyncIterableIterator<string> {
+  public async *messages(): AsyncIterableIterator<string> {
     while (true) {
-      const [plaintext, err] = await this._reader.readLine();
-
-      if (err === "EOF") {
-        return;
-      }
-
-      yield plaintext;
-    }
-  }
-}
-
-class WebSocketSource implements MessageSource {
-  private _ws: WebSocket;
-
-  constructor(ws: WebSocket) {
-    this._ws = ws;
-  }
-
-  close() {
-    this._ws.close(OpCode.Close);
-  }
-
-  write(msg: string | Uint8Array): Promise<void> {
-    return this._ws.send(msg);
-  }
-
-  async *messages(): AsyncIterableIterator<string> {
-    for await (const event of this._ws.receive()) {
-      if (typeof event === "string") {
-        yield event;
-      } else if (event instanceof Uint8Array) {
-        yield decode(event);
+      try {
+        const plaintext = await this._reader.readLine();
+        if (plaintext) {
+          yield plaintext;
+        }
+      } catch (err) {
+        if (err === 'EOF') {
+          return;
+        }
       }
     }
   }
 }
+
+// NOTE: Class commented out due to non usage.
+// class WebSocketSource implements MessageSource {
+//   private _ws: WebSocket;
+
+//   public constructor(ws: WebSocket) {
+//     this._ws = ws;
+//   }
+
+//   public close(): void {
+//     this._ws.close(OpCode.Close);
+//   }
+
+//   public write(msg: string | Uint8Array): Promise<void> {
+//     return this._ws.send(msg);
+//   }
+
+//   public async *messages(): AsyncIterableIterator<string> {
+//     for await (const event of this._ws.receive()) {
+//       if (typeof event === 'string') {
+//         yield event;
+//       } else if (event instanceof Uint8Array) {
+//         yield decode(event);
+//       }
+//     }
+//   }
+// }
 
 // ensures that there are no crashes if a wrong
 // property on a MessageData object, as a try-catch
 // block does not catch
-const messageProxyHandler: ProxyHandler<MessageData> = {
-  get(target, property) {
+const messageProxyHandler = {
+  get(target: MessageData, property: string): ProxyHandler<MessageData> {
     if (target[property] === undefined) {
-      throw new TypeError(
-        `Property ${String(property)} does not exist on Message.`
-      );
+      throw new TypeError(`Property ${String(property)} does not exist on Message.`);
     }
 
     return target[property];
-  }
+  },
 };
 
 enum RPL {
-  WELCOME = "001",
-  YOURHOST = "002",
-  CREATED = "003",
-  MYINFO = "004",
-  ISUPPORT = "005",
-  LUSERCLIENT = "251",
-  LUSEROP = "252",
-  LUSERUNKNOWN = "253",
-  LUSERCHANNELS = "254",
-  LUSERME = "255",
-  LOCALUSERS = "265",
-  GLOBALUSERS = "266",
-  ENDOFWHO = "315",
-  CHANNELMODEIS = "324",
-  NOTOPIC = "331",
-  TOPIC = "332",
-  WHOREPLY = "352",
-  NAMREPLY = "353",
-  ENDOFNAMES = "366"
+  WELCOME = '001',
+  YOURHOST = '002',
+  CREATED = '003',
+  MYINFO = '004',
+  ISUPPORT = '005',
+  LUSERCLIENT = '251',
+  LUSEROP = '252',
+  LUSERUNKNOWN = '253',
+  LUSERCHANNELS = '254',
+  LUSERME = '255',
+  LOCALUSERS = '265',
+  GLOBALUSERS = '266',
+  ENDOFWHO = '315',
+  CHANNELMODEIS = '324',
+  NOTOPIC = '331',
+  TOPIC = '332',
+  WHOREPLY = '352',
+  NAMREPLY = '353',
+  ENDOFNAMES = '366',
 }
 
 enum ERR {
-  NOSUCHNICK = "401",
-  NOSUCHSERVER = "402",
-  NOSUCHCHANNEL = "403",
-  UNKNOWNCOMMAND = "421",
-  NOMOTD = "422",
-  NONICKNAMEGIVEN = "431",
-  ERRONEUSNICKNAME = "432",
-  NICKNAMEINUSE = "433",
-  NOTONCHANNEL = "442",
-  NEEDMOREPARAMS = "461",
-  ALREADYREGISTERED = "462",
-  BANNEDFROMCHAN = "474"
+  NOSUCHNICK = '401',
+  NOSUCHSERVER = '402',
+  NOSUCHCHANNEL = '403',
+  UNKNOWNCOMMAND = '421',
+  NOMOTD = '422',
+  NONICKNAMEGIVEN = '431',
+  ERRONEUSNICKNAME = '432',
+  NICKNAMEINUSE = '433',
+  NOTONCHANNEL = '442',
+  NEEDMOREPARAMS = '461',
+  ALREADYREGISTERED = '462',
+  BANNEDFROMCHAN = '474',
 }
 
 export class IrcServer {
-  private _listener: Listener;
+  private _listener: Deno.Listener;
   private _channels: Map<string, Channel> = new Map();
   /** Maps nicknames to user objects */
   private _conns: Map<string, ServerConn> = new Map();
   private _host: string;
 
-  constructor(address: string) {
-    this._listener = listen("tcp", address);
+  public constructor(address: string) {
+    this._listener = listen('tcp', address);
 
     // Host prefixes for replies don't have the port usually
-    this._host = address.substring(0, address.indexOf(":"));
+    this._host = address.substring(0, address.indexOf(':'));
   }
 
   /** Allows server to begin accepting connections and messages */
-  async start() {
+  public async start(): Promise<void> {
     while (true) {
-      let conn: Conn;
+      let conn: Deno.Conn;
       try {
         conn = await this._listener.accept();
       } catch (e) {
@@ -182,69 +184,66 @@ export class IrcServer {
   //   acceptRoutine();
   // }
 
-  private async _handleUserMessages(conn: ServerConn) {
+  private async _handleUserMessages(conn: ServerConn): Promise<void> {
     for await (const msg of conn.readMessages()) {
       try {
         const parsedMsg = new Proxy(parse(msg), messageProxyHandler);
 
         switch (parsedMsg.command) {
-          case "NICK":
+          case 'NICK':
             const nickname = parsedMsg.params[0];
             // TODO make sure nickname is sound
             this.NICK(conn, nickname);
             break;
 
-          case "USER":
+          case 'USER':
             const username = parsedMsg.params[0];
             const fullname = parsedMsg.params[3];
             this.USER(conn, username, fullname);
             break;
 
-          case "JOIN":
+          case 'JOIN':
             const channels = parseCSV(parsedMsg.params[0]);
             const keys = parseCSV(parsedMsg.params[1]);
             this.JOIN(conn, channels, keys);
             break;
 
-          case "PART":
+          case 'PART':
             const partChannels = parseCSV(parsedMsg.params[0]);
             this.PART(conn, partChannels, parsedMsg.params[1]);
             break;
 
-          case "PRIVMSG":
+          case 'PRIVMSG':
             const targets = parseCSV(parsedMsg.params[0]);
             this.PRIVMSG(conn, targets, parsedMsg.params[1]);
             break;
 
-          case "NAMES":
+          case 'NAMES':
             const nameChannels = parseCSV(parsedMsg.params[0]);
             this.NAMES(conn, nameChannels);
             break;
 
-          case "WHO":
+          case 'WHO':
             const channelName = parsedMsg.params[0];
             this.WHO(conn, channelName);
             break;
 
-          case "QUIT":
+          case 'QUIT':
             const reason = parsedMsg.params[0];
             this.QUIT(conn, reason);
             break;
 
-          case "MODE":
+          case 'MODE':
             const target = parsedMsg.params[0];
             this.MODE(conn, target);
             break;
 
-          case "PING":
+          case 'PING':
             this.PING(conn);
             break;
 
           default:
-            this._replyToConn(conn, ERR.UNKNOWNCOMMAND, [
-              parsedMsg.command,
-              ":Unknown/unimplemented command"
-            ]);
+            this._replyToConn(conn, ERR.UNKNOWNCOMMAND, [parsedMsg.command, ':Unknown/unimplemented command']);
             break;
         }
       } catch (err) {
@@ -255,33 +254,26 @@ export class IrcServer {
     this.QUIT(conn);
   }
 
-  close() {
+  public close(): void {
     this._listener.close();
-    for (const [_, conn] of this._conns) {
+    for (const [, conn] of this._conns) {
       conn.close();
     }
   }
 
-  private _sendMsg(
-    conn: ServerConn,
-    prefix: string,
-    command: string,
-    params: string[]
-  ) {
-    return conn.write(`:${prefix} ${command} ${params.join(" ")}\r\n`);
+  private _sendMsg(conn: ServerConn, prefix: string, command: string, params: string[]): void {
+    return conn.write(`:${prefix} ${command} ${params.join(' ')}\r\n`);
   }
 
-  private _replyToConn(conn: ServerConn, command: string, params: string[]) {
+  private _replyToConn(conn: ServerConn, command: string, params: string[]): void {
     // for unregistered users, most servers just put an asterisk in the <client> spot
-    const nickname = conn.nickname || "*";
-    let n = conn.write(
-      `:${this._host} ${command} ${nickname} ${params.join(" ")}\r\n`
-    );
+    const nickname = conn.nickname || '*';
+    let n = conn.write(`:${this._host} ${command} ${nickname} ${params.join(' ')}\r\n`);
 
     return n;
   }
 
-  private _attemptRegisterConn(conn: ServerConn) {
+  private _attemptRegisterConn(conn: ServerConn): void {
     if (!conn.nickname || !conn.username || !conn.fullname) {
       // can only register with all three
       return;
@@ -295,45 +287,29 @@ export class IrcServer {
     }
 
     // after successful registration, multiple mandated responses from server
-    this._replyToConn(conn, RPL.WELCOME, [
-      `:Welcome to the server ${conn.nickname}`
-    ]);
-    this._replyToConn(conn, RPL.YOURHOST, [
-      ":Your host is PLACEHOLDER, running version PLACEHOLDER"
-    ]);
-    this._replyToConn(conn, RPL.CREATED, [
-      ":This server was created PLACEHOLDER"
-    ]);
-    this._replyToConn(conn, RPL.MYINFO, ["Misc information here"]);
-    this._replyToConn(conn, RPL.ISUPPORT, [
-      "PLACEHOLDER :are supported by this server."
-    ]);
+    this._replyToConn(conn, RPL.WELCOME, [`:Welcome to the server ${conn.nickname}`]);
+    this._replyToConn(conn, RPL.YOURHOST, [':Your host is PLACEHOLDER, running version PLACEHOLDER']);
+    this._replyToConn(conn, RPL.CREATED, [':This server was created PLACEHOLDER']);
+    this._replyToConn(conn, RPL.MYINFO, ['Misc information here']);
+    this._replyToConn(conn, RPL.ISUPPORT, ['PLACEHOLDER :are supported by this server.']);
     this._replyToLUSERS(conn);
     this._sendMOTD(conn);
   }
 
-  private _sendMOTD(conn: ServerConn) {
+  private _sendMOTD(conn: ServerConn): void {
     // TODO(fancyplants) send actual MOTD message
-    this._replyToConn(conn, ERR.NOMOTD, [":MOTD is missing"]);
+    this._replyToConn(conn, ERR.NOMOTD, [':MOTD is missing']);
   }
 
-  private _replyToLUSERS(conn: ServerConn) {
-    this._replyToConn(conn, RPL.LUSERCLIENT, [
-      ":There are PLACEHOLDER users and PLACEHOLDER invisible on 1 server"
-    ]);
-    this._replyToConn(conn, RPL.LUSEROP, [":PLACEHOLDER :operators online"]);
-    this._replyToConn(conn, RPL.LUSERUNKNOWN, [
-      "PLACEHOLDER :unknown connections"
-    ]);
-    this._replyToConn(conn, RPL.LUSERCHANNELS, [
-      `${this._channels.size} :channels formed`
-    ]);
-    this._replyToConn(conn, RPL.LUSERME, [
-      ":I have PLACEHOLDER clients and 1 server"
-    ]);
+  private _replyToLUSERS(conn: ServerConn): void {
+    this._replyToConn(conn, RPL.LUSERCLIENT, [':There are PLACEHOLDER users and PLACEHOLDER invisible on 1 server']);
+    this._replyToConn(conn, RPL.LUSEROP, [':PLACEHOLDER :operators online']);
+    this._replyToConn(conn, RPL.LUSERUNKNOWN, ['PLACEHOLDER :unknown connections']);
+    this._replyToConn(conn, RPL.LUSERCHANNELS, [`${this._channels.size} :channels formed`]);
+    this._replyToConn(conn, RPL.LUSERME, [':I have PLACEHOLDER clients and 1 server']);
   }
 
-  private _replyToNAMES(conn: ServerConn, channels: string[]) {
+  private _replyToNAMES(conn: ServerConn, channels: string[]): void {
     for (const channelName of channels) {
       const channel = this._channels.get(channelName);
       if (!channel) {
@@ -341,38 +317,34 @@ export class IrcServer {
       }
 
       const channelOps = channel.ops;
-      const userNicks = channel.users.map(user =>
-        channelOps.includes(user) ? `@${user.nickname}` : user.nickname
+      const userNicks = channel.users.map((user): string =>
+        channelOps.includes(user) ? `@${user.nickname}` : user.nickname,
       );
 
       for (const nick of userNicks) {
-        this._replyToConn(conn, RPL.NAMREPLY, ["=", channel.name, `:${nick}`]);
+        this._replyToConn(conn, RPL.NAMREPLY, ['=', channel.name, `:${nick}`]);
       }
 
-      this._replyToConn(conn, RPL.ENDOFNAMES, [
-        channel.name,
-        ":End of /NAMES list"
-      ]);
+      this._replyToConn(conn, RPL.ENDOFNAMES, [channel.name, ':End of /NAMES list']);
     }
   }
 
-  private _replyToTOPIC(conn: ServerConn, channelName: string) {
-    // TODO(fancyplants) implement channel topics
-    this._replyToConn(conn, RPL.NOTOPIC, [":No topic is set (TODO)"]);
-  }
+  // NOTE: Method commented out due to non usage.
+  // private _replyToTOPIC(conn: ServerConn, channelName: string): void {
+  //   // TODO(fancyplants) implement channel topics
+  //   this._replyToConn(conn, RPL.NOTOPIC, [':No topic is set (TODO)']);
+  // }
 
-  NICK(conn: ServerConn, nickname: string) {
+  public NICK(conn: ServerConn, nickname: string): void {
     if (!nickname) {
-      this._replyToConn(conn, ERR.NONICKNAMEGIVEN, [":No nickname given"]);
+      this._replyToConn(conn, ERR.NONICKNAMEGIVEN, [':No nickname given']);
       return;
     }
 
     // check if any registered users got that nickname
-    for (const [_, currConn] of this._conns) {
+    for (const [, currConn] of this._conns) {
       if (currConn.nickname === nickname) {
-        this._replyToConn(conn, ERR.NICKNAMEINUSE, [
-          `:Nickname "${nickname}" has already been taken.`
-        ]);
+        this._replyToConn(conn, ERR.NICKNAMEINUSE, [`:Nickname "${nickname}" has already been taken.`]);
         return;
       }
     }
@@ -385,7 +357,7 @@ export class IrcServer {
       const nicknameUpdateMsg = `:${oldNickname} NICK ${nickname}\r\n`;
 
       // maybe handle automatic updates to other user through Proxying User?
-      for (const [_, currConn] of this._conns) {
+      for (const [, currConn] of this._conns) {
         if (conn === currConn) {
           continue;
         }
@@ -398,26 +370,20 @@ export class IrcServer {
     }
   }
 
-  USER(conn: ServerConn, username: string, fullname: string) {
+  public USER(conn: ServerConn, username: string, fullname: string): void {
     if (!username || !fullname) {
-      this._replyToConn(conn, ERR.NEEDMOREPARAMS, [
-        ":Wrong params for USER command"
-      ]);
+      this._replyToConn(conn, ERR.NEEDMOREPARAMS, [':Wrong params for USER command']);
       return;
     }
 
     if (conn.isRegistered) {
-      this._replyToConn(conn, ERR.ALREADYREGISTERED, [
-        ":Cannot register twice"
-      ]);
+      this._replyToConn(conn, ERR.ALREADYREGISTERED, [':Cannot register twice']);
       return;
     }
 
-    for (const [_, currConn] of this._conns) {
+    for (const [, currConn] of this._conns) {
       if (currConn.username === username) {
-        this._replyToConn(conn, ERR.ALREADYREGISTERED, [
-          ":Cannot register twice"
-        ]);
+        this._replyToConn(conn, ERR.ALREADYREGISTERED, [':Cannot register twice']);
         return;
       }
     }
@@ -427,7 +393,7 @@ export class IrcServer {
     this._attemptRegisterConn(conn);
   }
 
-  JOIN(conn: ServerConn, channels: string[], keys: string[]) {
+  public JOIN(conn: ServerConn, channels: string[], keys: string[]): void {
     if (channels.length === 0) {
       this._replyToConn(conn, ERR.NEEDMOREPARAMS, []);
       return;
@@ -437,28 +403,24 @@ export class IrcServer {
       const channelName = channels[i];
       const key = keys[i];
       if (key) {
-        throw new Error("Not ready for keys yet!");
+        throw new Error('Not ready for keys yet!');
       }
 
-      if (!channelName.startsWith("#") && !channelName.startsWith("&")) {
+      if (!channelName.startsWith('#') && !channelName.startsWith('&')) {
         continue;
       }
 
       let channel = this._channels.get(channelName);
       if (!channel) {
         channel = new Channel(channelName);
-        channel.topic = "PLACEHOLDER";
+        channel.topic = 'PLACEHOLDER';
         this._channels.set(channelName, channel);
       }
       try {
         channel.joinChannel(conn);
       } catch (e) {
         if (e instanceof ChannelBannedError) {
-          this._replyToConn(conn, ERR.BANNEDFROMCHAN, [
-            conn.username,
-            channelName,
-            ":Cannot join channel (+b)"
-          ]);
+          this._replyToConn(conn, ERR.BANNEDFROMCHAN, [conn.username, channelName, ':Cannot join channel (+b)']);
         }
 
         // if joining failed, just try to join the next one
@@ -469,20 +431,17 @@ export class IrcServer {
       // this._replyToTOPIC(conn, channelName);
       // notify other users on channel that a new user has entered
       for (const userConn of channel.users) {
-        this._sendMsg(userConn, conn.nickname, "JOIN", [channelName]);
+        this._sendMsg(userConn, conn.nickname, 'JOIN', [channelName]);
       }
     }
   }
 
-  PART(conn: ServerConn, channels: string[], reason?: string) {
+  public PART(conn: ServerConn, channels: string[], reason?: string): void {
     // first check if user is actually within each channel
     for (const channelName of channels) {
       const isInChannel = conn.joinedChannels.has(channelName);
       if (!isInChannel) {
-        this._replyToConn(conn, ERR.NOTONCHANNEL, [
-          channelName,
-          ":You're not on that channel"
-        ]);
+        this._replyToConn(conn, ERR.NOTONCHANNEL, [channelName, ":You're not on that channel"]);
         return;
       }
     }
@@ -490,71 +449,68 @@ export class IrcServer {
     for (const channelName of channels) {
       const channel = conn.joinedChannels.get(channelName);
       // notify users in channel that this person has left
-      for (const userConn of channel.users) {
-        this._sendMsg(userConn, conn.nickname, "PART", [channelName, reason]);
+      if (channel) {
+        reason = reason || '';
+        for (const userConn of channel.users) {
+          this._sendMsg(userConn, conn.nickname, 'PART', [channelName, reason]);
+        }
+        channel.leaveChannel(conn);
       }
-      channel.leaveChannel(conn);
     }
   }
 
-  PRIVMSG(conn: ServerConn, targets: string[], message: string) {
+  public PRIVMSG(conn: ServerConn, targets: string[], message: string): void {
     for (const target of targets) {
       // TODO(fancyplants) target other channel prefixes
-      if (target.startsWith("#")) {
+      if (target.startsWith('#')) {
         const channel = this._channels.get(target);
         if (!channel) {
-          this._replyToConn(conn, ERR.NOSUCHNICK, [":No such channel"]);
-        }
+          this._replyToConn(conn, ERR.NOSUCHNICK, [':No such channel']);
+        } else {
+          for (const userConn of channel.users) {
+            if (userConn === conn) {
+              continue;
+            }
 
-        for (const userConn of channel.users) {
-          if (userConn === conn) {
-            continue;
+            this._sendMsg(userConn, conn.nickname, 'PRIVMSG', [channel.name, message]);
           }
-
-          this._sendMsg(userConn, conn.nickname, "PRIVMSG", [
-            channel.name,
-            message
-          ]);
         }
       } else {
         const targetConn = this._conns.get(target);
         if (!targetConn) {
-          this._replyToConn(conn, ERR.NOSUCHNICK, [":No such nick"]);
+          this._replyToConn(conn, ERR.NOSUCHNICK, [':No such nick']);
           continue;
         }
-        this._sendMsg(targetConn, conn.nickname, "PRIVMSG", [
-          targetConn.nickname,
-          message
-        ]);
+        this._sendMsg(targetConn, conn.nickname, 'PRIVMSG', [targetConn.nickname, message]);
       }
     }
   }
 
-  NAMES(conn: ServerConn, channels: string[]) {
+  public NAMES(conn: ServerConn, channels: string[]): void {
     this._replyToNAMES(conn, channels);
   }
 
-  WHO(conn: ServerConn, channelName: string) {
+  public WHO(conn: ServerConn, channelName: string): void {
     const channel = this._channels.get(channelName);
     if (!channel) {
-      this._replyToConn(conn, ERR.NOSUCHSERVER, [":No such server"]);
+      this._replyToConn(conn, ERR.NOSUCHSERVER, [':No such server']);
       return;
     }
     for (const userConn of channel.users) {
       this._replyToConn(conn, RPL.WHOREPLY, [
         channelName,
         userConn.username,
-        "PLACEHOLDER", // host of user
+        'PLACEHOLDER', // host of user
         this._host,
         userConn.nickname,
-        "G",
-        `:0 ${userConn.fullname}`
+        'G',
+        `:0 ${userConn.fullname}`,
       ]);
     }
-    this._replyToConn(conn, RPL.ENDOFWHO, [channelName, ":End of /WHO list"]);
+    this._replyToConn(conn, RPL.ENDOFWHO, [channelName, ':End of /WHO list']);
   }
 
-  QUIT(conn: ServerConn, reason = "User has exited server") {
+  public QUIT(conn: ServerConn, reason = 'User has exited server'): void {
     if (conn.nickname) {
       this._conns.delete(conn.nickname);
     }
@@ -566,79 +522,77 @@ export class IrcServer {
     for (const [name, channel] of conn.joinedChannels) {
       channel.leaveChannel(conn);
       for (const userConn of channel.users) {
-        this._sendMsg(userConn, conn.nickname, "PART", [name]);
+        this._sendMsg(userConn, conn.nickname, 'PART', [name]);
       }
     }
-    for (const [name, userConn] of this._conns) {
-      this._sendMsg(userConn, conn.nickname, "QUIT", [`:Quit: ${reason}`]);
+    for (const [, userConn] of this._conns) {
+      this._sendMsg(userConn, conn.nickname, 'QUIT', [`:Quit: ${reason}`]);
     }
   }
 
-  MODE(conn: ServerConn, target: string) {
-    if (target.startsWith("#") || target.startsWith("&")) {
+  public MODE(conn: ServerConn, target: string): void {
+    if (target.startsWith('#') || target.startsWith('&')) {
       const channel = this._channels.get(target);
       if (!channel) {
-        this._replyToConn(conn, ERR.NOSUCHCHANNEL, [":No such channel"]);
+        this._replyToConn(conn, ERR.NOSUCHCHANNEL, [':No such channel']);
         return;
       }
 
-      this._replyToConn(conn, RPL.CHANNELMODEIS, [
-        target,
-        `+c${channel.modes.join("")}`
-      ]);
+      this._replyToConn(conn, RPL.CHANNELMODEIS, [target, `+c${channel.modes.join('')}`]);
     } else {
       // TODO
     }
   }
 
-  PING(conn: ServerConn) {
-    this._replyToConn(conn, "PONG", []);
+  public PING(conn: ServerConn): void {
+    this._replyToConn(conn, 'PONG', []);
   }
 }
 
 /** Represents IRCv3 tags parsed as an object. */
-export type ParsedTags = { [tag: string]: string | boolean };
+export interface ParsedTags {
+  [tag: string]: string | boolean;
+}
 
 /** MessageData is a parsed representation of a client message */
 export interface MessageData {
+  [key: string]: any;
   tags: ParsedTags;
   prefix: string;
   command: string;
   params: string[];
 }
 
-function parseCSV(input: string) {
-  return input ? input.split(",").filter(channel => channel !== "") : [];
+function parseCSV(input: string): string[] {
+  return input ? input.split(',').filter((channel): boolean => channel !== '') : [];
 }
 
 const RFC1459MaxMessageLength = 512;
 
 export function parse(message: string): MessageData {
   if (message.length > RFC1459MaxMessageLength) {
-    throw new InvalidMessageException("Message cannot exceed 512 characters.");
+    throw new InvalidMessageException('Message cannot exceed 512 characters.');
   }
 
-  if (message.endsWith("\r\n")) {
-    throw new InvalidMessageException(
-      "CRLF must be removed from string before using parse."
-    );
+  if (message.endsWith('\r\n')) {
+    throw new InvalidMessageException('CRLF must be removed from string before using parse.');
   }
 
   let tags: ParsedTags = {};
-  let prefix = "";
+  let prefix = '';
   let command: string;
   let params: string[] = [];
   let index = 0;
-  const messageParts = message.split(" ");
+  const messageParts = message.split(' ');
 
   // check for tags
-  if (messageParts[index].startsWith("@")) {
+  if (messageParts[index].startsWith('@')) {
     tags = parseTagsToJSON(messageParts[index]);
     index++;
   }
 
   // check for possible prefix
-  if (messageParts[index].startsWith(":")) {
+  if (messageParts[index].startsWith(':')) {
     prefix = messageParts[index];
     index++;
   }
@@ -654,11 +608,9 @@ export function parse(message: string): MessageData {
 
     // any param that starts with a colon is the last param with whitespace
     // included
-    if (currentPart.startsWith(":")) {
+    if (currentPart.startsWith(':')) {
       const remainingParts = messageParts.slice(i);
-      const lastParam = remainingParts.reduce(
-        (prev, curr) => `${prev} ${curr}`
-      );
+      const lastParam = remainingParts.reduce((prev, curr): string => `${prev} ${curr}`);
       params.push(lastParam);
       break;
     }
@@ -670,19 +622,19 @@ export function parse(message: string): MessageData {
     tags,
     prefix,
     command,
-    params
+    params,
   };
 }
 
 function parseTagsToJSON(tags: string): ParsedTags {
   const parsedTags: ParsedTags = {};
   const strWithoutSymbol = tags.substring(1);
-  const tagParts = strWithoutSymbol.split(";");
+  const tagParts = strWithoutSymbol.split(';');
 
   for (const part of tagParts) {
-    const [key, value] = part.split("=");
-    if (value === "") {
-      parsedTags[key] = "";
+    const [key, value] = part.split('=');
+    if (value === '') {
+      parsedTags[key] = '';
     } else if (!value) {
       parsedTags[key] = true;
     } else {
@@ -697,11 +649,11 @@ function parseTagsToJSON(tags: string): ParsedTags {
 export class InvalidMessageException extends Error {}
 
 export enum UserMode {
-  Invisible = "+i",
-  Operator = "+o",
-  LocalOperator = "+O",
-  Registered = "+r",
-  Wallops = "+w"
+  Invisible = '+i',
+  Operator = '+o',
+  LocalOperator = '+O',
+  Registered = '+r',
+  Wallops = '+w',
 }
 
 export class ServerConn {
@@ -709,87 +661,79 @@ export class ServerConn {
   private _userModes: Set<UserMode> = new Set();
 
   public joinedChannels: Map<string, Channel> = new Map();
-  public nickname = "";
-  public username = "";
-  public fullname = "";
+  public nickname = '';
+  public username = '';
+  public fullname = '';
   public isRegistered = false;
-  public id = "";
+  public id = '';
 
-  constructor(source: MessageSource) {
+  public constructor(source: MessageSource) {
     this._source = source;
   }
 
-  readMessages(): AsyncIterableIterator<string> {
+  public readMessages(): AsyncIterableIterator<string> {
     return this._source.messages();
   }
 
   /** Writes message to underlying BufWriter */
-  write(msg: string | Uint8Array) {
+  public write(msg: string | Uint8Array): void {
     this._source.write(msg);
   }
 
-  close() {
+  public close(): void {
     this._source.close();
   }
 
-  get modes() {
+  public get modes(): UserMode[] {
     return Array.from(this._userModes);
   }
 
-  get isInvisible() {
+  public get isInvisible(): boolean {
     return this._userModes.has(UserMode.Invisible);
   }
 
-  set isInvisible(bool: boolean) {
-    bool
-      ? this._userModes.add(UserMode.Invisible)
-      : this._userModes.delete(UserMode.Invisible);
+  public set isInvisible(bool: boolean) {
+    bool ? this._userModes.add(UserMode.Invisible) : this._userModes.delete(UserMode.Invisible);
   }
 
-  get isOp() {
+  public get isOp(): boolean {
     return this._userModes.has(UserMode.Operator);
   }
 
-  set isOp(bool: boolean) {
-    bool
-      ? this._userModes.add(UserMode.Operator)
-      : this._userModes.delete(UserMode.Operator);
+  public set isOp(bool: boolean) {
+    bool ? this._userModes.add(UserMode.Operator) : this._userModes.delete(UserMode.Operator);
   }
 
-  get isLocalOp() {
+  public get isLocalOp(): boolean {
     return this._userModes.has(UserMode.LocalOperator);
   }
 
-  set isLocalOp(bool: boolean) {
-    bool
-      ? this._userModes.add(UserMode.LocalOperator)
-      : this._userModes.delete(UserMode.LocalOperator);
+  public set isLocalOp(bool: boolean) {
+    bool ? this._userModes.add(UserMode.LocalOperator) : this._userModes.delete(UserMode.LocalOperator);
   }
 
-  get isWallops() {
+  public get isWallops(): boolean {
     return this._userModes.has(UserMode.Wallops);
   }
 
-  set isWallops(bool: boolean) {
-    bool
-      ? this._userModes.add(UserMode.Wallops)
-      : this._userModes.delete(UserMode.Wallops);
+  public set isWallops(bool: boolean) {
+    bool ? this._userModes.add(UserMode.Wallops) : this._userModes.delete(UserMode.Wallops);
   }
 }
 
 export class ChannelBannedError extends Error {}
 
 export enum ChannelMode {
-  Ban = "+b",
-  Exception = "+e",
-  ClientLimit = "+l",
-  InviteOnly = "+i",
-  InviteException = "+I",
-  Key = "+k",
-  Moderated = "+m",
-  Secret = "+s",
-  ProtectedTopic = "+t",
-  NoExternalMessages = "+n"
+  Ban = '+b',
+  Exception = '+e',
+  ClientLimit = '+l',
+  InviteOnly = '+i',
+  InviteException = '+I',
+  Key = '+k',
+  Moderated = '+m',
+  Secret = '+s',
+  ProtectedTopic = '+t',
+  NoExternalMessages = '+n',
 }
 
 export class Channel {
@@ -804,23 +748,21 @@ export class Channel {
   private _ops: Set<ServerConn> = new Set();
   private _users: Set<ServerConn> = new Set();
 
-  constructor(name: string) {
+  public constructor(name: string) {
     this.name = name;
+    this.topic = '';
     this._banMode = {
       enabled: false,
-      bannedUsers: []
+      bannedUsers: [],
     };
   }
 
-  joinChannel(conn: ServerConn) {
+  public joinChannel(conn: ServerConn): void {
     if (this._users.size === 0) {
       this._ops.add(conn);
     }
 
-    if (
-      this._banMode.enabled &&
-      this._banMode.bannedUsers.includes(conn.username)
-    ) {
+    if (this._banMode.enabled && this._banMode.bannedUsers.includes(conn.username)) {
       throw new ChannelBannedError();
     }
 
@@ -829,7 +771,7 @@ export class Channel {
     return;
   }
 
-  leaveChannel(conn: ServerConn) {
+  public leaveChannel(conn: ServerConn): void {
     this._users.delete(conn);
     conn.joinedChannels.delete(this.name);
     if (this._users.size === 0) {
@@ -837,23 +779,23 @@ export class Channel {
     }
   }
 
-  get users() {
+  public get users(): ServerConn[] {
     return Array.from(this._users);
   }
 
-  get ops() {
+  public get ops(): ServerConn[] {
     return Array.from(this._ops);
   }
 
-  get modes() {
+  public get modes(): ChannelMode[] {
     return Array.from(this._modes);
   }
 
-  set banMode(bool: boolean) {
+  public set banMode(bool: boolean) {
     this._banMode.enabled = bool;
   }
 
-  get banMode() {
+  public get banMode(): boolean {
     return this._banMode.enabled;
   }
 }
